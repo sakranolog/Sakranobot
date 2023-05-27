@@ -10,6 +10,8 @@ user_memories = {}
 
 
 openai.api_key = config.openai_api_key
+gpt_engine = config.openai_gpt_engine
+
 async def handle_text(update: Update, context: CallbackContext):
     if update.message and update.message.text:
         user_id = update.effective_user.id
@@ -26,18 +28,17 @@ async def handle_text(update: Update, context: CallbackContext):
 
             # Generate a response from GPT-3
             try:
-                completion = openai.Completion.create(engine="text-davinci-003", prompt=prompt, max_tokens=150)
+                completion = openai.Completion.create(engine=gpt_engine, prompt=prompt, max_tokens=150)
                 response = completion.choices[0].text.strip()
-            except Exception:
-                response = "The GPT service is currently not available, try again later."
+            except Exception as e:
+                response = f"The GPT service is currently not available, try again later. Error: {str(e)}"
         else:
             # Send the text to GPT-3 without the memories
             try:
-                completion = openai.Completion.create(engine="text-davinci-003", prompt=text, max_tokens=150)
+                completion = openai.Completion.create(engine=gpt_engine, prompt=text, max_tokens=150)
                 response = completion.choices[0].text.strip()
-            except Exception:
-                response = "The GPT service is currently not available, try again later."
-
+            except Exception as e:
+                response = f"The GPT service is currently not available, try again later. Error: {str(e)}"
         # Send the response to the user
         await context.bot.send_message(chat_id=update.effective_chat.id, text=response)
 
