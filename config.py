@@ -1,3 +1,4 @@
+#config.py
 import os
 from dotenv import load_dotenv
 
@@ -11,4 +12,4 @@ else:
 
 mongodb_connection_string = os.getenv("MONGODB_CONNECTION_STRING")
 openai_api_key = os.getenv("OPENAI_API_KEY")
-openai_gpt_engine = "text-davinci-003"
+openai_gpt_engine = "gpt-3.5-turbo"

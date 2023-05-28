@@ -1,46 +1,85 @@
+#handlers.py
 import openai
 from telegram import Update
 from telegram.ext import CallbackContext
 import datetime
 import db
 import config
-
-
-user_memories = {}
-
+from datetime import datetime, timedelta
 
 openai.api_key = config.openai_api_key
-gpt_engine = config.openai_gpt_engine
+
+user_memories = {}
+chat_contexts = {}
+
+
 
 async def handle_text(update: Update, context: CallbackContext):
-    if update.message and update.message.text:
-        user_id = update.effective_user.id
-        text = update.message.text
+    user_id = update.effective_user.id
+    text = update.message.text
 
-        # Get user's memories
-        memories = db.get_memories(user_id)
-        memory_texts = [memory["memory_text"] for memory in memories]
+    # Get user's memories
+    memories = db.get_memories(user_id)
+    memory_texts = [memory["memory_text"] for memory in memories]
 
-        # Check if the message ends with a question mark
-        if text.strip().endswith("?"):
-            # Prepare the prompt with the memories
-            prompt = f"This is a list of my memories: {', '.join(memory_texts)}. Based on this, I would like to know: {text}"
+    # Create the conversation history for the chat model
+    conversation = [
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": f"This is a list of my memories: {', '.join(memory_texts)}"},
+        {"role": "user", "content": text}
+    ]
 
-            # Generate a response from GPT-3
-            try:
-                completion = openai.Completion.create(engine=gpt_engine, prompt=prompt, max_tokens=150)
-                response = completion.choices[0].text.strip()
-            except Exception as e:
-                response = f"The GPT service is currently not available, try again later. Error: {str(e)}"
-        else:
-            # Send the text to GPT-3 without the memories
-            try:
-                completion = openai.Completion.create(engine=gpt_engine, prompt=text, max_tokens=150)
-                response = completion.choices[0].text.strip()
-            except Exception as e:
-                response = f"The GPT service is currently not available, try again later. Error: {str(e)}"
-        # Send the response to the user
-        await context.bot.send_message(chat_id=update.effective_chat.id, text=response)
+    # Generate a response from GPT
+    try:
+        response = openai.ChatCompletion.create(
+          model=config.openai_gpt_engine,
+          messages=conversation
+        )
+        response_text = response['choices'][0]['message']['content']
+
+        # Infer the intent
+        intent = infer_intent(response_text)
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=f"I think you want to: {intent}. Is that correct?")
+    except Exception as e:
+        response_text = f"The GPT service is currently not available, try again later. Error: {str(e)}"
+
+    # Add message to context
+    if user_id in chat_contexts:
+        chat_contexts[user_id]['messages'].append(text)
+        chat_contexts[user_id]['last_activity'] = datetime.now()
+    else:
+        chat_contexts[user_id] = {
+            'messages': [text],
+            'last_activity': datetime.now(),
+            'pending_intent': intent
+        }
+
+    # Check if the context should be reset
+    if len(chat_contexts[user_id]['messages']) >= 5:
+        reset_context(user_id)
+
+def infer_intent(response_text):
+    if "remember" in response_text:
+        return "Add a memory"
+    elif "memories" in response_text:
+        return "List all memories"
+    # Add more intents as needed
+    else:
+        return "Unknown"
+
+async def reset_context(user_id):
+    chat_contexts[user_id]['messages'] = []
+    chat_contexts[user_id]['pending_intent'] = None
+    # Send a message to the user stating it started a new chat context
+    await context.bot.send_message(chat_id=user_id, text="Starting a new chat context.")
+
+
+
+
+
+
+
+
 
 
 async def start(update: Update, context: CallbackContext):
