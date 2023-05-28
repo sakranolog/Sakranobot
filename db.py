@@ -5,7 +5,10 @@ import config
 client = MongoClient(config.mongodb_connection_string)
 
 # Connect to your specific database
-db = client.sakranobot
+if config.is_test:
+    db = client.sakranobot_test
+else:
+    db = client.sakranobot
 
 # Connect to your specific collection within the database
 collection = db.memories
