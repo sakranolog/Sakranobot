@@ -1,4 +1,3 @@
-#handlers.py
 import openai
 from telegram import Update
 from telegram.ext import CallbackContext
@@ -12,6 +11,22 @@ openai.api_key = config.openai_api_key
 user_memories = {}
 chat_contexts = {}
 
+async def get_intent(user_id: str, message: str):
+    conversation = [
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": message}
+    ]
+
+    try:
+        response = openai.ChatCompletion.create(
+            model=config.openai_gpt_engine,
+            messages=conversation
+        )
+        response_text = response['choices'][0]['message']['content']
+        return response_text
+    except Exception as e:
+        print(f"Error in get_intent: {str(e)}")
+        return None
 
 
 async def handle_text(update: Update, context: CallbackContext):
@@ -37,8 +52,8 @@ async def handle_text(update: Update, context: CallbackContext):
         )
         response_text = response['choices'][0]['message']['content']
 
-        # Infer the intent
-        intent = infer_intent(response_text)
+        # Get the intent
+        intent = await get_intent(user_id, response_text)
         await context.bot.send_message(chat_id=update.effective_chat.id, text=f"I think you want to: {intent}. Is that correct?")
     except Exception as e:
         response_text = f"The GPT service is currently not available, try again later. Error: {str(e)}"
@@ -47,32 +62,18 @@ async def handle_text(update: Update, context: CallbackContext):
     if user_id in chat_contexts:
         chat_contexts[user_id]['messages'].append(text)
         chat_contexts[user_id]['last_activity'] = datetime.now()
-    else:
-        chat_contexts[user_id] = {
-            'messages': [text],
-            'last_activity': datetime.now(),
-            'pending_intent': intent
-        }
+        chat_contexts[user_id]['pending_intent'] = intent if 'intent' in locals() else None
 
     # Check if the context should be reset
     if len(chat_contexts[user_id]['messages']) >= 5:
-        reset_context(user_id)
+        await reset_context(user_id)
 
-def infer_intent(response_text):
-    if "remember" in response_text:
-        return "Add a memory"
-    elif "memories" in response_text:
-        return "List all memories"
-    # Add more intents as needed
-    else:
-        return "Unknown"
 
 async def reset_context(user_id):
     chat_contexts[user_id]['messages'] = []
     chat_contexts[user_id]['pending_intent'] = None
     # Send a message to the user stating it started a new chat context
     await context.bot.send_message(chat_id=user_id, text="Starting a new chat context.")
-
 
 
 
