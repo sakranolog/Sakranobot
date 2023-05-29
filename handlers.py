@@ -4,7 +4,7 @@ from telegram.ext import CallbackContext
 import datetime
 import db
 import config
-from datetime import datetime, timedelta
+import datetime
 
 openai.api_key = config.openai_api_key
 
@@ -30,6 +30,7 @@ async def get_intent(user_id: str, message: str):
 
 
 async def handle_text(update: Update, context: CallbackContext):
+    handle_user_state(update, context)
     user_id = update.effective_user.id
     text = update.message.text
 
@@ -70,6 +71,7 @@ async def handle_text(update: Update, context: CallbackContext):
 
 
 async def reset_context(user_id):
+    
     chat_contexts[user_id]['messages'] = []
     chat_contexts[user_id]['pending_intent'] = None
     # Send a message to the user stating it started a new chat context
@@ -84,9 +86,11 @@ async def reset_context(user_id):
 
 
 async def start(update: Update, context: CallbackContext):
+    handle_user_state(update, context)
     await context.bot.send_message(chat_id=update.effective_chat.id, text="Here will be text about the bot and how it functions, for now ise /help to see the commands.")
 
 async def remember(update: Update, context: CallbackContext):
+    handle_user_state(update, context)
     # Get the memory text from the user's message
     memory_text = " ".join(context.args)
 
@@ -109,6 +113,7 @@ async def remember(update: Update, context: CallbackContext):
     await context.bot.send_message(chat_id=update.effective_chat.id, text="Memory saved!")
 
 async def memories(update: Update, context: CallbackContext):
+    handle_user_state(update, context)
     # Fetch the memories
     user_memories = db.get_memories(update.effective_user.id)
 
@@ -131,6 +136,7 @@ async def memories(update: Update, context: CallbackContext):
 
 async def delete(update: Update, context: CallbackContext):
     # Check if we are awaiting a /delete command
+    handle_user_state(update, context)
     if not context.user_data.get('awaiting_delete', False):
         await context.bot.send_message(chat_id=update.effective_chat.id, text="You can only use /delete immediately after /memories.")
         return
@@ -155,3 +161,16 @@ async def delete(update: Update, context: CallbackContext):
     # We are no longer awaiting a /delete command
     context.user_data['awaiting_delete'] = False
 
+
+
+
+def handle_user_state(update, context):
+    user_data = update.message.from_user  # this is the user data object from the Telegram bot
+    print(f"User {user_data.id} registered a message")
+    # Check if the user exists in the database
+    if not db.get_user(user_data.id):
+        # If the user doesn't exist, create a new user
+        print(f"Creating new user {user_data.id}")
+        db.create_user(user_data.to_dict())
+    # Update the count of messages sent by the user
+    db.update_messages_sent(user_data.id)
