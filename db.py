@@ -36,6 +36,7 @@ def create_user(user_data):
         "payments": []
     })
 
+
 def add_payment(user_id, ipn_data):
     # Convert ImmutableMultiDict to dict
     payment_data = dict(ipn_data)
@@ -44,7 +45,14 @@ def add_payment(user_id, ipn_data):
     # Add the payment_data to the user's payments array
     users_collection.update_one(
         {"user_id": user_id}, 
-        {"$push": {"payments": payment_data}, "$inc": {"message_limit": config.payment_massage_addition_amount}}
+        {"$push": {"payments": payment_data}}
+    )
+    # Increment the message_limit by the payment_message_addition_amount
+    # Ensure the increment amount is an integer
+    increment_amount = int(config.payment_message_addition_amount)
+    users_collection.update_one(
+        {"user_id": user_id}, 
+        {"$inc": {"message_limit": increment_amount}}
     )
 
 

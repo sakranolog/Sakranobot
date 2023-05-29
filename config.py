@@ -16,4 +16,4 @@ openai_gpt_engine = "gpt-3.5-turbo"
 
 
 payment_page_url = os.getenv("PAYMENT_PAGE_URL")
-payment_massage_addition_amount = os.getenv("PAYMENT_MASSAGE_ADDITION_AMOUNT")
+payment_message_addition_amount = os.getenv("PAYMENT_MESSAGE_ADDITION_AMOUNT")

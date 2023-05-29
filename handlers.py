@@ -180,7 +180,7 @@ async def pay(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
 
     # Construct the URL
-    url = config.payment_page_url + "?m__user_id=" + str(user_id)
+    url = config.payment_page_url + "?m__userid=" + str(user_id)
 
     # Send a message to the user with the URL
     await context.bot.send_message(chat_id=update.effective_chat.id, text=f"To pay, please click the following link: {url}")
