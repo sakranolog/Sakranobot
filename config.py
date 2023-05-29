@@ -13,3 +13,7 @@ else:
 mongodb_connection_string = os.getenv("MONGODB_CONNECTION_STRING")
 openai_api_key = os.getenv("OPENAI_API_KEY")
 openai_gpt_engine = "gpt-3.5-turbo"
+
+
+payment_page_url = os.getenv("PAYMENT_PAGE_URL")
+payment_massage_addition_amount = os.getenv("PAYMENT_MASSAGE_ADDITION_AMOUNT")

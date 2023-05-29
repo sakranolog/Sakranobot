@@ -14,6 +14,7 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler('remember', handlers.remember))
     application.add_handler(CommandHandler('memories', handlers.memories))
     application.add_handler(CommandHandler('delete', handlers.delete))
+    application.add_handler(CommandHandler('pay', handlers.pay))
 
     # Register the MessageHandler with the Application
 

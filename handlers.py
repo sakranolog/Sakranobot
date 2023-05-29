@@ -174,3 +174,13 @@ def handle_user_state(update, context):
         db.create_user(user_data.to_dict())
     # Update the count of messages sent by the user
     db.update_messages_sent(user_data.id)
+
+async def pay(update: Update, context: CallbackContext):
+    # Get the user's ID
+    user_id = update.effective_user.id
+
+    # Construct the URL
+    url = config.payment_page_url + "?m__user_id=" + str(user_id)
+
+    # Send a message to the user with the URL
+    await context.bot.send_message(chat_id=update.effective_chat.id, text=f"To pay, please click the following link: {url}")
