@@ -31,7 +31,7 @@ def create_user(user_data):
         "user_data": user_data,
         "join_date": datetime.datetime.utcnow(),
         "messages_sent": 0,
-        "message_limit": 30,
+        "message_limit": config.default_message_limit,
         "api_keys": {},
         "payments": []
     })

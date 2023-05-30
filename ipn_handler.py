@@ -1,6 +1,7 @@
 from flask import Flask, request, render_template
 import db
 import config
+import os
 
 
 
@@ -23,4 +24,4 @@ def hello():
     return render_template('test.html')
 
 if __name__ == "__main__":
-    app.run(port=5000)
+    app.run(host='0.0.0.0',port=os.getenv("PORT",5000))

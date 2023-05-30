@@ -50,6 +50,18 @@ async def handle_text(update: Update, context: CallbackContext):
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 async def start(update: Update, context: CallbackContext):
     if not await handle_user_state(update, context):
         return
@@ -128,6 +140,9 @@ async def delete(update: Update, context: CallbackContext):
 
     # We are no longer awaiting a /delete command
     context.user_data['awaiting_delete'] = False
+
+
+
 
 
 
