@@ -48,7 +48,6 @@ def add_payment(user_id, ipn_data):
         {"$push": {"payments": payment_data}}
     )
     # Increment the message_limit by the payment_message_addition_amount
-    # Ensure the increment amount is an integer
     increment_amount = int(config.payment_message_addition_amount)
     users_collection.update_one(
         {"user_id": user_id}, 
@@ -62,3 +61,17 @@ def get_user(user_id):
 
 def update_messages_sent(user_id):
     users_collection.update_one({"user_id": user_id}, {"$inc": {"messages_sent": 1}})
+
+def get_messages_sent(user_id):
+    user = users_collection.find_one({"user_id": user_id}, {"_id": 0, "messages_sent": 1})
+    if user and "messages_sent" in user:
+        return user["messages_sent"]
+    else:
+        return 0
+    
+def get_message_limit(user_id):
+    user = users_collection.find_one({"user_id": user_id}, {"_id": 0, "message_limit": 1})
+    if user and "message_limit" in user:
+        return user["message_limit"]
+    else:
+        return 0

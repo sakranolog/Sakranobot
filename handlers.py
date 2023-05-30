@@ -11,86 +11,53 @@ openai.api_key = config.openai_api_key
 user_memories = {}
 chat_contexts = {}
 
-async def get_intent(user_id: str, message: str):
+def get_intents(message: str, intent_list: list):
+    intent_list_str = ', '.join(intent_list)
     conversation = [
-        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "system", "content": f"You are a bot helping understand the intents of the user. Answer only with the intents, no extra text or description. The only possible intents are: {intent_list_str}. if it's not in the list return none"},
         {"role": "user", "content": message}
     ]
 
     try:
         response = openai.ChatCompletion.create(
             model=config.openai_gpt_engine,
-            messages=conversation
+            messages=conversation,
+            temperature=1.0
         )
-        response_text = response['choices'][0]['message']['content']
-        return response_text
+        # Assuming that the GPT model returns the intents in the response
+        intents = response['choices'][0]['message']['content']
     except Exception as e:
         print(f"Error in get_intent: {str(e)}")
-        return None
+        intents = ""
 
+    return intents
 
 async def handle_text(update: Update, context: CallbackContext):
-    handle_user_state(update, context)
-    user_id = update.effective_user.id
+    if not await handle_user_state(update, context):
+        return
     text = update.message.text
+    intents = get_intents(text, config.intents_list)
+    # assuming intents are separated by some delimiter like a comma
+    intents = intents.split(",") if intents else [None]
+    # add a second None if only one intent (or none) was returned
+    if len(intents) == 1:
+        intents.append(None)
 
-    # Get user's memories
-    memories = db.get_memories(user_id)
-    memory_texts = [memory["memory_text"] for memory in memories]
-
-    # Create the conversation history for the chat model
-    conversation = [
-        {"role": "system", "content": "You are a helpful assistant."},
-        {"role": "user", "content": f"This is a list of my memories: {', '.join(memory_texts)}"},
-        {"role": "user", "content": text}
-    ]
-
-    # Generate a response from GPT
-    try:
-        response = openai.ChatCompletion.create(
-          model=config.openai_gpt_engine,
-          messages=conversation
-        )
-        response_text = response['choices'][0]['message']['content']
-
-        # Get the intent
-        intent = await get_intent(user_id, response_text)
-        await context.bot.send_message(chat_id=update.effective_chat.id, text=f"I think you want to: {intent}. Is that correct?")
-    except Exception as e:
-        response_text = f"The GPT service is currently not available, try again later. Error: {str(e)}"
-
-    # Add message to context
-    if user_id in chat_contexts:
-        chat_contexts[user_id]['messages'].append(text)
-        chat_contexts[user_id]['last_activity'] = datetime.now()
-        chat_contexts[user_id]['pending_intent'] = intent if 'intent' in locals() else None
-
-    # Check if the context should be reset
-    if len(chat_contexts[user_id]['messages']) >= 5:
-        await reset_context(user_id)
-
-
-async def reset_context(user_id):
-    
-    chat_contexts[user_id]['messages'] = []
-    chat_contexts[user_id]['pending_intent'] = None
-    # Send a message to the user stating it started a new chat context
-    await context.bot.send_message(chat_id=user_id, text="Starting a new chat context.")
-
-
-
-
-
+    intent1, intent2 = intents
+    response_text = f"I think your intent is {intent1} or {intent2}"
+    await context.bot.send_message(chat_id=update.effective_chat.id, text=response_text)
 
 
 
 
 async def start(update: Update, context: CallbackContext):
-    handle_user_state(update, context)
-    await context.bot.send_message(chat_id=update.effective_chat.id, text="Here will be text about the bot and how it functions, for now ise /help to see the commands.")
+    if not await handle_user_state(update, context):
+        return
+    await context.bot.send_message(chat_id=update.effective_chat.id, text=config.start_text)
 
 async def remember(update: Update, context: CallbackContext):
-    handle_user_state(update, context)
+    if not await handle_user_state(update, context):
+        return
     # Get the memory text from the user's message
     memory_text = " ".join(context.args)
 
@@ -100,7 +67,6 @@ async def remember(update: Update, context: CallbackContext):
     # Prepare the memory data to be saved
     memory_data = {
         "user_id": user_data["id"],
-        "user_data": user_data,
         "memory_text": memory_text,
         "timestamp": datetime.datetime.now(),
         "deleted": False
@@ -113,7 +79,8 @@ async def remember(update: Update, context: CallbackContext):
     await context.bot.send_message(chat_id=update.effective_chat.id, text="Memory saved!")
 
 async def memories(update: Update, context: CallbackContext):
-    handle_user_state(update, context)
+    if not await handle_user_state(update, context):
+        return
     # Fetch the memories
     user_memories = db.get_memories(update.effective_user.id)
 
@@ -136,7 +103,8 @@ async def memories(update: Update, context: CallbackContext):
 
 async def delete(update: Update, context: CallbackContext):
     # Check if we are awaiting a /delete command
-    handle_user_state(update, context)
+    if not await handle_user_state(update, context):
+        return
     if not context.user_data.get('awaiting_delete', False):
         await context.bot.send_message(chat_id=update.effective_chat.id, text="You can only use /delete immediately after /memories.")
         return
@@ -164,16 +132,25 @@ async def delete(update: Update, context: CallbackContext):
 
 
 
-def handle_user_state(update, context):
+async def handle_user_state(update, context):
     user_data = update.message.from_user  # this is the user data object from the Telegram bot
-    print(f"User {user_data.id} registered a message")
+    print(f"User {user_data.id} registered a message. has sent total: {db.get_messages_sent(user_data.id)} and bought: {db.get_message_limit(user_data.id)}")
     # Check if the user exists in the database
+    if db.get_messages_sent(user_data.id) > db.get_message_limit(user_data.id):
+        print(f"User {user_data.id} over message limit! has sent: {db.get_messages_sent(user_data.id)} and bought: {db.get_message_limit(user_data.id)}")
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=f"You don't have any message credits left! (sent: {db.get_messages_sent(user_data.id)} payed for: {db.get_message_limit(user_data.id)}).\nPlease use /pay to buy more message credits")
+        return False
     if not db.get_user(user_data.id):
         # If the user doesn't exist, create a new user
         print(f"Creating new user {user_data.id}")
         db.create_user(user_data.to_dict())
     # Update the count of messages sent by the user
     db.update_messages_sent(user_data.id)
+
+
+    
+    return True
+
 
 async def pay(update: Update, context: CallbackContext):
     # Get the user's ID
@@ -183,4 +160,4 @@ async def pay(update: Update, context: CallbackContext):
     url = config.payment_page_url + "?m__userid=" + str(user_id)
 
     # Send a message to the user with the URL
-    await context.bot.send_message(chat_id=update.effective_chat.id, text=f"To pay, please click the following link: {url}")
+    await context.bot.send_message(chat_id=update.effective_chat.id, text=f"To add 500 messages to your quota, please click the following link to pay: {url}")

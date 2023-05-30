@@ -15,9 +15,9 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler('memories', handlers.memories))
     application.add_handler(CommandHandler('delete', handlers.delete))
     application.add_handler(CommandHandler('pay', handlers.pay))
-
+    #TODO: hander for user status (incl. quota)
     # Register the MessageHandler with the Application
-
+    application.add_handler(MessageHandler(filters.Text() & ~filters.Command(), handlers.handle_text))
     
     # Start the Application
     application.run_polling(1.0)
