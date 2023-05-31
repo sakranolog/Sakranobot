@@ -31,22 +31,29 @@ def create_user(user_data):
         "user_data": user_data,
         "join_date": datetime.datetime.utcnow(),
         "messages_sent": 0,
-        "message_limit": 30,
+        "message_limit": config.default_message_limit,
         "api_keys": {},
         "payments": []
     })
 
-def add_payment(user_id, date, amount, currency, units_bought):
-    payment_data = {
-        "date": date,
-        "amount": amount,
-        "currency": currency,
-        "units_bought": units_bought
-    }
+
+def add_payment(user_id, ipn_data):
+    # Convert ImmutableMultiDict to dict
+    payment_data = dict(ipn_data)
+    # Convert user_id to integer, as it's an integer in the database
+    payment_data['userid'] = int(payment_data['userid'])
+    # Add the payment_data to the user's payments array
     users_collection.update_one(
         {"user_id": user_id}, 
         {"$push": {"payments": payment_data}}
     )
+    # Increment the message_limit by the payment_message_addition_amount
+    increment_amount = int(config.payment_message_addition_amount)
+    users_collection.update_one(
+        {"user_id": user_id}, 
+        {"$inc": {"message_limit": increment_amount}}
+    )
+
 
 
 def get_user(user_id):
@@ -54,3 +61,17 @@ def get_user(user_id):
 
 def update_messages_sent(user_id):
     users_collection.update_one({"user_id": user_id}, {"$inc": {"messages_sent": 1}})
+
+def get_messages_sent(user_id):
+    user = users_collection.find_one({"user_id": user_id}, {"_id": 0, "messages_sent": 1})
+    if user and "messages_sent" in user:
+        return user["messages_sent"]
+    else:
+        return 0
+    
+def get_message_limit(user_id):
+    user = users_collection.find_one({"user_id": user_id}, {"_id": 0, "message_limit": 1})
+    if user and "message_limit" in user:
+        return user["message_limit"]
+    else:
+        return 0

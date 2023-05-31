@@ -11,12 +11,12 @@ if __name__ == "__main__":
 
     # Register the CommandHandler with the Application
     application.add_handler(CommandHandler('start', handlers.start))
-    application.add_handler(CommandHandler('remember', handlers.remember))
+    application.add_handler(CommandHandler(['remember','r'], handlers.remember))
     application.add_handler(CommandHandler('memories', handlers.memories))
     application.add_handler(CommandHandler('delete', handlers.delete))
-
+    application.add_handler(CommandHandler('pay', handlers.pay))
     # Register the MessageHandler with the Application
-
+    application.add_handler(MessageHandler(filters.Text() & ~filters.Command(), handlers.handle_text))
     
     # Start the Application
     application.run_polling(1.0)
