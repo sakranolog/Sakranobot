@@ -23,16 +23,34 @@ async def handle_text(update: Update, context: CallbackContext):
         context.user_data['chat_context'] = {
             'messages': [],  # List to hold the last 20 messages
             'timestamp': datetime.now(),  # Timestamp of the last message
-            'memories': db.get_memories(user_id)  # Load user's memories from the DB
+            'memories': [mem for mem in db.get_memories(user_id) if not mem['deleted']]  # Load user's memories from the DB, filtering out deleted ones
         }
+        # Modify memories to only include 'memory_text' and 'timestamp'
+        context.user_data['chat_context']['memories'] = [
+            f"{mem['memory_text']}, {mem['timestamp'].strftime('%Y-%m-%d %H:%M:%S')}"
+            for mem in context.user_data['chat_context']['memories']
+        ]
+        print("Modified chat context: ", context.user_data['chat_context'])
+
+
         # Clear endchat flag
         if 'endchat' in context.user_data:
             del context.user_data['endchat']
 
         print("Chat context initialized: ", context.user_data['chat_context'])
 
+        # Add the initial system message
+        context.user_data['chat_context']['messages'].append({
+            'role': 'system',
+            'content': f'You are a helpful assistant that helps the user with everything they need. You have the context of this conversation and the user\'s memories at your disposal with their creation dates at your disposal to give useful answers. You also know that now the exact date and time are {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}.',
+        })
+
+        # Add the initial user message
+        context.user_data['chat_context']['messages'].append({'role': 'user','content': f"This is the context of our current chat: {context.user_data['chat_context']['messages']} and this is the list of my memories: {context.user_data['chat_context']['memories']}",})
+
+
         # Inform the user about the 15-minute inactivity rule
-        await context.bot.send_message(chat_id=update.effective_chat.id, text="Note: If there is no activity for 15 minutes, this chat will end.\nEvery message from that point will start a new context.")
+        #await context.bot.send_message(chat_id=update.effective_chat.id, text="Note: If there is no activity for 15 minutes, this chat will end.\nEvery message from that point will start a new context.")
 
     user_message = update.message.text
     print("User message: ", user_message)
@@ -43,39 +61,19 @@ async def handle_text(update: Update, context: CallbackContext):
         'content': user_message,
     })
 
-    # If there are more than 20 messages in the chat context, remove the oldest one
+    # If there are more than 18 additional messages in the chat context, reset the context while preserving the initial messages
     if len(context.user_data['chat_context']['messages']) > 20:
-        context.user_data['chat_context']['messages'].pop(0)
+        initial_messages = context.user_data['chat_context']['messages'][:2]
+        new_messages = context.user_data['chat_context']['messages'][-18:]
+        context.user_data['chat_context']['messages'] = initial_messages + new_messages
 
     # Update the timestamp of the last message
-    context.user_data['chat_context']['timestamp'] = datetime.now()
+    context.user_data['chat_context']['timestamp'] = datetime.now()    
 
-    # Print chat context for debugging
-    #print("Chat context after adding user's message: ", context.user_data['chat_context'])    
-
-    # Check if user already has a system message
-    #if not any(message['role'] == 'system' for message in context.user_data['chat_context']['messages']):
-    #    context.user_data['chat_context']['messages'].append({
-    #        'role': 'system',
-    #        'content': 'Loading user\'s memories...'
-    #    })
-
-    # Find system message and append memories
-    #for message in context.user_data['chat_context']['messages']:
-    #    if message['role'] == 'system':
-    #        # Append the memories with a brief introduction
-    #        memory_texts = [mem['memory_text'] for mem in context.user_data['chat_context']['memories']]
-    #        if memory_texts:
-    #            memories_intro = "For context, here are some memories related to this user:"
-    #            memories_content = '\n'.join(memory_texts)
-    #            message['content'] += f'\n{memories_intro}\n{memories_content}'
-    #        else:
-    #            message['content'] += '\nNo specific memories related to this user are available for context.'
-    
-    
     # 1. Prepare the message list
-    message_list = context.user_data['chat_context']['messages'] + [{'role': 'system', 'content': f"For context, here are some memories related to this user: {mem['memory_text']}"} for mem in context.user_data['chat_context']['memories']]
+    message_list = context.user_data['chat_context']['messages'] + [{'role': 'system', 'content': f"For context, here are some memories related to this user: {mem}"} for mem in context.user_data['chat_context']['memories']]
     print(message_list)
+    
     # 2. Make the request to the OpenAI API
     try:
         response = openai.ChatCompletion.create(
@@ -102,6 +100,7 @@ async def handle_text(update: Update, context: CallbackContext):
 
     print("AI message: ", ai_message)
     print("Chat context after adding AI's message: ", context.user_data['chat_context'])
+
 
 
 
