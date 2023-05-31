@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 load_dotenv()  # take environment variables from .env.
 is_test = os.getenv("IS_TEST")
 
-if is_test:
+if is_test == "true":
     telegram_api_key = os.getenv("TEST_TELEGRAM_API_KEY")
 else:
     telegram_api_key = os.getenv("TELEGRAM_API_KEY")

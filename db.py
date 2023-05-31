@@ -7,7 +7,7 @@ import datetime
 client = MongoClient(config.mongodb_connection_string)
 
 # Connect to your specific database
-if config.is_test:
+if config.is_test == "true":
     db = client.sakranobot_test
 else:
     db = client.sakranobot
